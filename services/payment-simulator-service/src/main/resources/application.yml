@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: payment-simulator-service
+  threads:
+    virtual:
+      enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: payment-simulator-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.bank.payment.orchestration.domain
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.mongo.MongoHealthContributorAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+payment-orchestration:
+  temporal:
+    target: ${TEMPORAL_TARGET:127.0.0.1:7233}
+    namespace: ${TEMPORAL_NAMESPACE:payments}
+  activemq:
+    broker-url: ${ACTIVEMQ_URL:tcp://localhost:61616}
+    username: ${ACTIVEMQ_USER:admin}
+    password: ${ACTIVEMQ_PASS:admin}
+    inbound-queue: payments.inbound.mt
+  rabbit:
+    inbound-queue: payments.inbound.mx
+  kafka-topics:
+    normalized-payments: payments.normalized
+    partner-request-prefix: partner.
+    partner-response-prefix: partner.
+  simulator:
+    enabled: ${SIMULATOR_ENABLED:true}
+    default-mode: ${SIMULATOR_DEFAULT_MODE:MIXED}
+    short-delay-min-seconds: 0
+    short-delay-max-seconds: 2
+    mixed:
+      reject-probability: 0.3
+      delay-probability: 0.4
+      long-delay-min-seconds: 5
+      long-delay-max-seconds: 45
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

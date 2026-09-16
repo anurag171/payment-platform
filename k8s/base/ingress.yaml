@@ -1,0 +1,56 @@
+# Path-based routing to the two HTTP-facing services. Every workflow/activity service
+# in this platform is Temporal-only (no inbound HTTP API) — see README "How services
+# actually talk to each other" for why they deliberately have no Ingress rule here.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payment-platform-ingress
+  namespace: payment-platform
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # Swap the annotation prefix if you're on a different ingress controller
+    # (alb.ingress.kubernetes.io/* for AWS ALB, cloud.google.com/* for GKE, etc.) —
+    # the path-routing structure below stays the same either way.
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: payments.internal.example.com   # replace with your real hostname
+    http:
+      paths:
+      - path: /api/payments(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: payment-gateway-service
+            port:
+              number: 8080
+      - path: /api/repair(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: payment-gateway-service
+            port:
+              number: 8080
+      - path: /api/simulate(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: payment-simulator-service
+            port:
+              number: 8080
+      # /api/simulate/inbound also lands on payment-simulator-service — it's the same
+      # controller family, so one rule covers both.
+      - path: /gateway/swagger-ui(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: payment-gateway-service
+            port:
+              number: 8080
+      - path: /simulator/swagger-ui(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: payment-simulator-service
+            port:
+              number: 8080

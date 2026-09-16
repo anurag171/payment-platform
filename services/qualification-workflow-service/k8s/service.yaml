@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: qualification-workflow-service
+  labels:
+    app: qualification-workflow-service
+spec:
+  selector:
+    app: qualification-workflow-service
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,85 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: payment-platform
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  - ../../services/inbound-normalization-workflow-service/k8s
+  - ../../services/qualification-workflow-service/k8s
+  - ../../services/warehouse-workflow-service/k8s
+  - ../../services/mop-derivation-workflow-service/k8s
+  - ../../services/repair-workflow-service/k8s
+  - ../../services/payment-processing-workflow-service/k8s
+  - ../../services/translation-activity-service/k8s
+  - ../../services/enrichment-activity-service/k8s
+  - ../../services/value-date-activity-service/k8s
+  - ../../services/mop-activity-service/k8s
+  - ../../services/repair-activity-service/k8s
+  - ../../services/partner-activity-service/k8s
+  - ../../services/clearing-activity-service/k8s
+  - ../../services/audit-activity-service/k8s
+  - ../../services/reversal-activity-service/k8s
+  - ../../services/payment-gateway-service/k8s
+  - ../../services/payment-simulator-service/k8s
+
+# Override every service's placeholder image (see each Deployment's `image:
+# <name>:latest`) with your real registry + tag in one place. Run
+# `kustomize edit set image <name>=<registry>/<name>:<tag>` per service instead of
+# hand-editing this list, or just edit it directly — either works.
+images:
+  - name: inbound-normalization-workflow-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/inbound-normalization-workflow-service
+    newTag: "1.0.0"
+  - name: qualification-workflow-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/qualification-workflow-service
+    newTag: "1.0.0"
+  - name: warehouse-workflow-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/warehouse-workflow-service
+    newTag: "1.0.0"
+  - name: mop-derivation-workflow-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/mop-derivation-workflow-service
+    newTag: "1.0.0"
+  - name: repair-workflow-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/repair-workflow-service
+    newTag: "1.0.0"
+  - name: payment-processing-workflow-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/payment-processing-workflow-service
+    newTag: "1.0.0"
+  - name: translation-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/translation-activity-service
+    newTag: "1.0.0"
+  - name: enrichment-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/enrichment-activity-service
+    newTag: "1.0.0"
+  - name: value-date-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/value-date-activity-service
+    newTag: "1.0.0"
+  - name: mop-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/mop-activity-service
+    newTag: "1.0.0"
+  - name: repair-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/repair-activity-service
+    newTag: "1.0.0"
+  - name: partner-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/partner-activity-service
+    newTag: "1.0.0"
+  - name: clearing-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/clearing-activity-service
+    newTag: "1.0.0"
+  - name: audit-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/audit-activity-service
+    newTag: "1.0.0"
+  - name: reversal-activity-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/reversal-activity-service
+    newTag: "1.0.0"
+  - name: payment-gateway-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/payment-gateway-service
+    newTag: "1.0.0"
+  - name: payment-simulator-service
+    newName: REPLACE_WITH_YOUR_REGISTRY/payment-simulator-service
+    newTag: "1.0.0"

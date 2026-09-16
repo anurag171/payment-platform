@@ -1,0 +1,9 @@
+**/target/
+**/.git/
+**/*.iml
+**/.idea/
+**/.mvn/wrapper/maven-wrapper.jar
+_generator/
+_template/
+k8s/
+*.md

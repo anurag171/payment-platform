@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: partner-activity-service
+  labels:
+    app: partner-activity-service
+    tier: activity
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: partner-activity-service
+  template:
+    metadata:
+      labels:
+        app: partner-activity-service
+        tier: activity
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+      - name: partner-activity-service
+        # Plain placeholder image name+tag — overridden per-environment via the root
+        # kustomization.yaml's `images:` transformer (kustomize edit set image ...),
+        # not Helm. Do not hand-edit this line per environment; edit the kustomization.
+        image: "partner-activity-service:latest"
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: TEMPORAL_TARGET
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: temporal-target}
+        - name: TEMPORAL_NAMESPACE
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: temporal-namespace}
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: redis-host}
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: redis-port}
+        - name: KAFKA_BOOTSTRAP
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: kafka-bootstrap}
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet: {path: /actuator/health/readiness, port: 8080}
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet: {path: /actuator/health/liveness, port: 8080}
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        startupProbe:
+          httpGet: {path: /actuator/health, port: 8080}
+          failureThreshold: 30
+          periodSeconds: 5

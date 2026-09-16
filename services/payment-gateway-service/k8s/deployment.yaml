@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-gateway-service
+  labels:
+    app: payment-gateway-service
+    tier: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-gateway-service
+  template:
+    metadata:
+      labels:
+        app: payment-gateway-service
+        tier: gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+      - name: payment-gateway-service
+        # Plain placeholder image name+tag — overridden per-environment via the root
+        # kustomization.yaml's `images:` transformer (kustomize edit set image ...),
+        # not Helm. Do not hand-edit this line per environment; edit the kustomization.
+        image: "payment-gateway-service:latest"
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: TEMPORAL_TARGET
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: temporal-target}
+        - name: TEMPORAL_NAMESPACE
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: temporal-namespace}
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef: {name: payment-platform-secrets, key: mongo-uri}
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: redis-host}
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: redis-port}
+        - name: KAFKA_BOOTSTRAP
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: kafka-bootstrap}
+        - name: RABBITMQ_HOST
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: rabbitmq-host}
+        - name: ACTIVEMQ_URL
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: activemq-url}
+        resources:
+          requests:
+            cpu: "300m"
+            memory: "384Mi"
+          limits:
+            cpu: "600m"
+            memory: "768Mi"
+        readinessProbe:
+          httpGet: {path: /actuator/health/readiness, port: 8080}
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet: {path: /actuator/health/liveness, port: 8080}
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        startupProbe:
+          httpGet: {path: /actuator/health, port: 8080}
+          failureThreshold: 30
+          periodSeconds: 5

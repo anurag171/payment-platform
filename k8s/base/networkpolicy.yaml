@@ -1,0 +1,60 @@
+# Baseline zero-trust-ish posture: deny all inbound traffic to every pod in the
+# namespace by default, then explicitly allow the two things that legitimately need to
+# reach a pod's port 8080: (1) the ingress controller, for the two HTTP-facing services,
+# and (2) your monitoring namespace, for Prometheus scraping /actuator/prometheus on
+# every service. Adjust the namespaceSelector labels to match your actual ingress
+# controller and monitoring namespaces. Egress is intentionally left unrestricted here —
+# see the comment at the bottom for how to tighten it once your infra hostnames/CIDRs
+# are fixed.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: payment-platform
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller-to-http-services
+  namespace: payment-platform
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: In, values: [payment-gateway-service, payment-simulator-service]}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx   # match your actual ingress-controller namespace
+      ports:
+        - {protocol: TCP, port: 8080}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: payment-platform
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring   # match your actual Prometheus namespace
+      ports:
+        - {protocol: TCP, port: 8080}
+
+# Egress is NOT restricted above — every workflow/activity pod needs outbound access to
+# the Temporal frontend Service, and the relevant subset also need Mongo/Redis/Kafka/
+# RabbitMQ/ActiveMQ/DNS. Once those are on fixed in-cluster Service names (as the
+# ConfigMap already assumes), add an egress-allow NetworkPolicy scoped to exactly those
+# destinations + kube-dns (UDP/TCP 53) and flip policyTypes to ["Ingress","Egress"]
+# above — left as unrestricted egress here to avoid shipping a policy that silently
+# breaks connectivity to infra whose in-cluster DNS names may differ from the
+# ConfigMap's placeholders in your actual cluster.

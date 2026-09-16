@@ -1,0 +1,228 @@
+version: "3.8"
+
+# Full local stack: all 17 microservices + every piece of infra they depend on.
+# `docker compose up -d` builds and starts everything. First build is slow (each
+# service's Dockerfile runs its own `mvn -am package`, no shared build cache across
+# services in this simple compose file) — see README "Speeding up local builds" for a
+# shared-.m2-volume trick if that gets old.
+
+services:
+  mongo:
+    image: mongo:7
+    ports: ["27017:27017"]
+    volumes: ["mongo-data:/data/db"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports: ["5672:5672", "15672:15672"]
+
+  activemq:
+    image: apache/activemq-classic:5.18.4
+    ports: ["61616:61616", "8161:8161"]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    ports: ["9092:9092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    depends_on: [mongo]
+    ports: ["7233:7233"]
+    environment:
+      DB: sqlite
+
+  temporal-ui:
+    image: temporalio/ui:2.31.2
+    depends_on: [temporal]
+    ports: ["8081:8080"]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+
+
+  inbound-normalization-workflow-service:
+    build:
+      context: .
+      dockerfile: services/inbound-normalization-workflow-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  qualification-workflow-service:
+    build:
+      context: .
+      dockerfile: services/qualification-workflow-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  warehouse-workflow-service:
+    build:
+      context: .
+      dockerfile: services/warehouse-workflow-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  mop-derivation-workflow-service:
+    build:
+      context: .
+      dockerfile: services/mop-derivation-workflow-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  repair-workflow-service:
+    build:
+      context: .
+      dockerfile: services/repair-workflow-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  payment-processing-workflow-service:
+    build:
+      context: .
+      dockerfile: services/payment-processing-workflow-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  translation-activity-service:
+    build:
+      context: .
+      dockerfile: services/translation-activity-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  enrichment-activity-service:
+    build:
+      context: .
+      dockerfile: services/enrichment-activity-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  value-date-activity-service:
+    build:
+      context: .
+      dockerfile: services/value-date-activity-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  mop-activity-service:
+    build:
+      context: .
+      dockerfile: services/mop-activity-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  repair-activity-service:
+    build:
+      context: .
+      dockerfile: services/repair-activity-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  partner-activity-service:
+    build:
+      context: .
+      dockerfile: services/partner-activity-service/Dockerfile
+    depends_on: ['temporal', 'redis', 'kafka']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:9092
+
+  clearing-activity-service:
+    build:
+      context: .
+      dockerfile: services/clearing-activity-service/Dockerfile
+    depends_on: ['temporal', 'redis', 'kafka']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:9092
+
+  audit-activity-service:
+    build:
+      context: .
+      dockerfile: services/audit-activity-service/Dockerfile
+    depends_on: ['temporal', 'mongo']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+      MONGO_URI: mongodb://mongo:27017/payments
+
+  reversal-activity-service:
+    build:
+      context: .
+      dockerfile: services/reversal-activity-service/Dockerfile
+    depends_on: ['temporal']
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+
+  payment-gateway-service:
+    build:
+      context: .
+      dockerfile: services/payment-gateway-service/Dockerfile
+    depends_on: ['temporal', 'mongo', 'redis', 'kafka', 'rabbitmq', 'activemq']
+    ports: ["8090:8080"]
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+      MONGO_URI: mongodb://mongo:27017/payments
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:9092
+      RABBITMQ_HOST: rabbitmq
+      ACTIVEMQ_URL: tcp://activemq:61616
+
+  payment-simulator-service:
+    build:
+      context: .
+      dockerfile: services/payment-simulator-service/Dockerfile
+    depends_on: ['temporal', 'kafka', 'rabbitmq', 'activemq']
+    ports: ["8091:8080"]
+    environment:
+      TEMPORAL_TARGET: temporal:7233
+      TEMPORAL_NAMESPACE: payments
+      KAFKA_BOOTSTRAP: kafka:9092
+      RABBITMQ_HOST: rabbitmq
+      ACTIVEMQ_URL: tcp://activemq:61616
+
+volumes:
+  mongo-data:

@@ -1,0 +1,226 @@
+# Single source of truth for "which microservices exist and what's in each."
+# generate_services.py reads this and stamps out every services/<name>/ directory from
+# _template/. Add a new activity or workflow service by adding an entry here and
+# re-running the generator — you don't hand-write pom.xml/Dockerfile/k8s manifests again.
+#
+# Field meanings:
+#   name           - kebab-case service dir name, Maven artifactId, k8s object name
+#   type           - workflow | activity | gateway | simulator (drives which template
+#                    variant of Application/Config gets rendered)
+#   task_queue     - Java constant name in TaskQueues.java (workflow/activity types only)
+#   impl_sources   - paths (relative to the OLD monolith's src/main/java package root)
+#                    of the concrete implementation file(s) this service owns
+#   extra_deps     - Maven artifactIds (beyond payment-common + web + actuator) this
+#                    service needs on its classpath
+#   http           - whether this service exposes a REST API (gets an Ingress path)
+#   replicas       - default replica count in the k8s Deployment
+#   resources      - k8s requests/limits
+#   description    - one line, used in generated README stubs and pom <description>
+
+services:
+  # ---------------------------------------------------------------- workflow services
+  - name: inbound-normalization-workflow-service
+    type: workflow
+    uses_mongo: false
+    uses_redis: false
+    task_queue: INBOUND_NORMALIZATION
+    impl_sources: [workflow/impl/InboundNormalizationWorkflowImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 2
+    resources: {cpu_request: 250m, mem_request: 256Mi, cpu_limit: 500m, mem_limit: 512Mi}
+    description: Translates inbound MT/MX payments to canonical PSD2 and starts the qualification chain.
+
+  - name: qualification-workflow-service
+    type: workflow
+    uses_mongo: false
+    uses_redis: false
+    task_queue: QUALIFICATION
+    impl_sources: [workflow/impl/QualificationWorkflowImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 2
+    resources: {cpu_request: 250m, mem_request: 256Mi, cpu_limit: 500m, mem_limit: 512Mi}
+    description: Enriches payments and decides warehouse vs immediate MOP derivation.
+
+  - name: warehouse-workflow-service
+    type: workflow
+    uses_mongo: false
+    uses_redis: false
+    task_queue: WAREHOUSE
+    impl_sources: [workflow/impl/WarehouseWorkflowImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 1
+    resources: {cpu_request: 100m, mem_request: 128Mi, cpu_limit: 250m, mem_limit: 256Mi}
+    description: Holds warehoused payments via a durable Temporal timer until value date. Low CPU — mostly sleeping workflows.
+
+  - name: mop-derivation-workflow-service
+    type: workflow
+    uses_mongo: false
+    uses_redis: false
+    task_queue: MOP_DERIVATION
+    impl_sources: [workflow/impl/MopDerivationWorkflowImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 2
+    resources: {cpu_request: 250m, mem_request: 256Mi, cpu_limit: 500m, mem_limit: 512Mi}
+    description: Derives method of payment and clearing rail; routes to repair or processing.
+
+  - name: repair-workflow-service
+    type: workflow
+    uses_mongo: false
+    uses_redis: false
+    task_queue: REPAIR_WORKFLOW
+    impl_sources: [workflow/impl/RepairWorkflowImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 1
+    resources: {cpu_request: 150m, mem_request: 192Mi, cpu_limit: 300m, mem_limit: 384Mi}
+    description: Parks payments on the manual repair worklist and requalifies on operator submission.
+
+  - name: payment-processing-workflow-service
+    type: workflow
+    uses_mongo: false
+    uses_redis: false
+    task_queue: PAYMENT_PROCESSING
+    impl_sources: [workflow/impl/PaymentProcessingWorkflowImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 3
+    resources: {cpu_request: 300m, mem_request: 320Mi, cpu_limit: 600m, mem_limit: 640Mi}
+    description: Fans out partner checks, submits to clearing, and runs the saga-based reversal on reject/return/timeout. Highest-traffic workflow service.
+
+  # ---------------------------------------------------------------- activity services
+  - name: translation-activity-service
+    type: activity
+    uses_mongo: false
+    uses_redis: false
+    task_queue: TRANSLATION_ACTIVITY
+    impl_sources: [activities/TranslationActivitiesImpl.java, translator/MessageTranslator.java, translator/TranslatorFactory.java, translator/MtToPsd2Translator.java, translator/MxToPsd2Translator.java]
+    extra_deps: []
+    http: false
+    replicas: 2
+    resources: {cpu_request: 200m, mem_request: 256Mi, cpu_limit: 400m, mem_limit: 512Mi}
+    description: MT/MX to canonical PSD2 translation. Pure CPU/string work, no external calls — cheap to scale horizontally.
+
+  - name: enrichment-activity-service
+    type: activity
+    uses_mongo: false
+    uses_redis: false
+    task_queue: ENRICHMENT_ACTIVITY
+    impl_sources: [activities/EnrichmentActivitiesImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 2
+    resources: {cpu_request: 200m, mem_request: 256Mi, cpu_limit: 400m, mem_limit: 512Mi}
+    description: Calls customer/account services for enrichment data.
+
+  - name: value-date-activity-service
+    type: activity
+    uses_mongo: false
+    uses_redis: false
+    task_queue: VALUE_DATE_ACTIVITY
+    impl_sources: [activities/ValueDateActivitiesImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 1
+    resources: {cpu_request: 100m, mem_request: 128Mi, cpu_limit: 250m, mem_limit: 256Mi}
+    description: Derives value date and the warehouse decision.
+
+  - name: mop-activity-service
+    type: activity
+    uses_mongo: false
+    uses_redis: false
+    task_queue: MOP_ACTIVITY
+    impl_sources: [activities/MopActivitiesImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 1
+    resources: {cpu_request: 100m, mem_request: 128Mi, cpu_limit: 250m, mem_limit: 256Mi}
+    description: Method-of-payment and clearing-rail derivation rules.
+
+  - name: repair-activity-service
+    type: activity
+    uses_mongo: false
+    uses_redis: false
+    task_queue: REPAIR_ACTIVITY
+    impl_sources: [activities/RepairActivitiesImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 1
+    resources: {cpu_request: 100m, mem_request: 128Mi, cpu_limit: 250m, mem_limit: 256Mi}
+    description: Repair-queue notification and requalification logic. Depends on enrichment-activity-service and mop-activity-service task queues.
+
+  - name: partner-activity-service
+    type: activity
+    uses_mongo: false
+    uses_redis: true
+    task_queue: PARTNER_ACTIVITY
+    impl_sources: [activities/PartnerActivitiesImpl.java, messaging/PartnerRequestPublisher.java]
+    extra_deps: [spring-kafka]
+    http: false
+    replicas: 3
+    resources: {cpu_request: 250m, mem_request: 256Mi, cpu_limit: 500m, mem_limit: 512Mi}
+    description: Publishes partner requests and registers Redis correlation entries. Scales with partner-check volume.
+
+  - name: clearing-activity-service
+    type: activity
+    uses_mongo: false
+    uses_redis: true
+    task_queue: CLEARING_ACTIVITY
+    impl_sources: [activities/ClearingActivitiesImpl.java]
+    extra_deps: [spring-kafka]
+    http: false
+    replicas: 2
+    resources: {cpu_request: 200m, mem_request: 256Mi, cpu_limit: 400m, mem_limit: 512Mi}
+    description: Builds and submits clearing-rail messages.
+
+  - name: audit-activity-service
+    type: activity
+    uses_mongo: true
+    uses_redis: false
+    task_queue: AUDIT_ACTIVITY
+    impl_sources: [activities/AuditActivitiesImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 2
+    resources: {cpu_request: 200m, mem_request: 256Mi, cpu_limit: 400m, mem_limit: 512Mi}
+    description: Writes Payment + WorkflowAuditRecord to MongoDB. Called from every other workflow service — watch this one's latency.
+
+  - name: reversal-activity-service
+    type: activity
+    uses_mongo: false
+    uses_redis: false
+    task_queue: REVERSAL_ACTIVITY
+    impl_sources: [activities/ReversalActivitiesImpl.java]
+    extra_deps: []
+    http: false
+    replicas: 1
+    resources: {cpu_request: 100m, mem_request: 128Mi, cpu_limit: 250m, mem_limit: 256Mi}
+    description: Saga compensations (reverseFxDeal, reverseBooking) and reversal notification. Low volume by design.
+
+  # ---------------------------------------------------------------- edge services
+  - name: payment-gateway-service
+    type: gateway
+    uses_mongo: true
+    uses_redis: true
+    task_queue: null
+    impl_sources: [messaging/NormalizedPaymentProducer.java, messaging/InboundMqListener.java, messaging/NormalizedPaymentConsumer.java, messaging/PartnerResponseListener.java, messaging/ClearingResponseListener.java, api/PaymentController.java, api/WorkflowStatusController.java, api/RepairController.java, config/KafkaTopicConfig.java, config/JmsConfig.java, config/OpenApiConfig.java]
+    extra_deps: [spring-kafka, spring-boot-starter-amqp, spring-boot-starter-jms, activemq-client, springdoc-openapi-starter-webmvc-ui]
+    http: true
+    replicas: 2
+    resources: {cpu_request: 300m, mem_request: 384Mi, cpu_limit: 600m, mem_limit: 768Mi}
+    description: Public edge — REST API, inbound MQ/Kafka bridge, and async response-to-signal delivery. The only service that starts the root workflow.
+
+  - name: payment-simulator-service
+    type: simulator
+    uses_mongo: false
+    uses_redis: false
+    task_queue: null
+    impl_sources: [simulator/InboundRequestGenerator.java, simulator/InboundRequestGeneratorController.java, simulator/SimulationMode.java, simulator/SimulationModeRegistry.java, simulator/SimulatedOutcome.java, simulator/OutcomeGenerator.java, simulator/FakePartnerResponseSimulator.java, simulator/FakeClearingSimulator.java, api/PartnerSimulationController.java, config/KafkaTopicConfig.java, config/JmsConfig.java, config/SimulatorConfig.java, config/OpenApiConfig.java]
+    extra_deps: [spring-kafka, spring-boot-starter-amqp, spring-boot-starter-jms, activemq-client, springdoc-openapi-starter-webmvc-ui]
+    http: true
+    replicas: 1
+    resources: {cpu_request: 200m, mem_request: 256Mi, cpu_limit: 400m, mem_limit: 512Mi}
+    description: Test/sandbox-only — synthetic inbound payments plus auto-responding fake partners/clearing rails (POSITIVE/NEGATIVE/MIXED modes). Deploy with replicas=0 or omit entirely outside non-prod.

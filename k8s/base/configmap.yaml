@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-platform-config
+  namespace: payment-platform
+data:
+  # Assumes Temporal Server is deployed separately (e.g. via the official Temporal Helm
+  # chart) into its own "temporal" namespace — every workflow/activity service connects
+  # OUTBOUND to this single address; they never call each other directly (see README
+  # "How services actually talk to each other").
+  temporal-target: "temporal-frontend.temporal.svc.cluster.local:7233"
+  temporal-namespace: "payments"
+  redis-host: "redis.payment-platform.svc.cluster.local"
+  redis-port: "6379"
+  kafka-bootstrap: "kafka.payment-platform.svc.cluster.local:9092"
+  rabbitmq-host: "rabbitmq.payment-platform.svc.cluster.local"
+  activemq-url: "tcp://activemq.payment-platform.svc.cluster.local:61616"

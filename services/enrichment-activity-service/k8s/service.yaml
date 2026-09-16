@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: enrichment-activity-service
+  labels:
+    app: enrichment-activity-service
+spec:
+  selector:
+    app: enrichment-activity-service
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

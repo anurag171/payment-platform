@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mop-activity-service
+  labels:
+    app: mop-activity-service
+spec:
+  selector:
+    app: mop-activity-service
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: translation-activity-service
+  labels:
+    app: translation-activity-service
+spec:
+  selector:
+    app: translation-activity-service
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

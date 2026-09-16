@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-simulator-service
+  labels:
+    app: payment-simulator-service
+    tier: simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-simulator-service
+  template:
+    metadata:
+      labels:
+        app: payment-simulator-service
+        tier: simulator
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+      - name: payment-simulator-service
+        # Plain placeholder image name+tag — overridden per-environment via the root
+        # kustomization.yaml's `images:` transformer (kustomize edit set image ...),
+        # not Helm. Do not hand-edit this line per environment; edit the kustomization.
+        image: "payment-simulator-service:latest"
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: TEMPORAL_TARGET
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: temporal-target}
+        - name: TEMPORAL_NAMESPACE
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: temporal-namespace}
+        - name: KAFKA_BOOTSTRAP
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: kafka-bootstrap}
+        - name: RABBITMQ_HOST
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: rabbitmq-host}
+        - name: ACTIVEMQ_URL
+          valueFrom:
+            configMapKeyRef: {name: payment-platform-config, key: activemq-url}
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "400m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet: {path: /actuator/health/readiness, port: 8080}
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet: {path: /actuator/health/liveness, port: 8080}
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        startupProbe:
+          httpGet: {path: /actuator/health, port: 8080}
+          failureThreshold: 30
+          periodSeconds: 5

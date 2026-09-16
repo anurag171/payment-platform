@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: value-date-activity-service
+  labels:
+    app: value-date-activity-service
+spec:
+  selector:
+    app: value-date-activity-service
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

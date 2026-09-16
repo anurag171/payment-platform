@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.bank.payment</groupId>
+    <artifactId>payment-platform</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>payment-platform</name>
+    <description>
+        Payment orchestration platform, decomposed into one microservice per Temporal
+        workflow type and one per activity group, plus a gateway (REST/MQ/Kafka edge)
+        and a test simulator. Build order matters: payment-common first (mvn install
+        -pl payment-common), or just run `mvn install` at this root — Maven's reactor
+        resolves the dependency order automatically since every service depends on
+        payment-common.
+    </description>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.1</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <java.version>21</java.version>
+        <temporal-sdk.version>1.25.1</temporal-sdk.version>
+        <springdoc.version>2.6.0</springdoc.version>
+        <testcontainers.version>1.20.1</testcontainers.version>
+    </properties>
+
+    <modules>
+        <module>payment-common</module>
+
+        <!-- Workflow services: one per Temporal workflow type -->
+        <module>services/inbound-normalization-workflow-service</module>
+        <module>services/qualification-workflow-service</module>
+        <module>services/warehouse-workflow-service</module>
+        <module>services/mop-derivation-workflow-service</module>
+        <module>services/repair-workflow-service</module>
+        <module>services/payment-processing-workflow-service</module>
+
+        <!-- Activity services: one per activity group -->
+        <module>services/translation-activity-service</module>
+        <module>services/enrichment-activity-service</module>
+        <module>services/value-date-activity-service</module>
+        <module>services/mop-activity-service</module>
+        <module>services/repair-activity-service</module>
+        <module>services/partner-activity-service</module>
+        <module>services/clearing-activity-service</module>
+        <module>services/audit-activity-service</module>
+        <module>services/reversal-activity-service</module>
+
+        <!-- Edge services -->
+        <module>services/payment-gateway-service</module>
+        <module>services/payment-simulator-service</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.bank.payment</groupId>
+                <artifactId>payment-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.temporal</groupId>
+                <artifactId>temporal-sdk</artifactId>
+                <version>${temporal-sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.temporal</groupId>
+                <artifactId>temporal-testing</artifactId>
+                <version>${temporal-sdk.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
